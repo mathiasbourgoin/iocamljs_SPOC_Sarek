@@ -36,9 +36,14 @@
 #       and archive names - I am not sure how robust that really is
 #
 #######################################################################
-
-
-
+PACKAGES=spoc sarek bigarray unix
+SYNTAX=js_of_ocaml.syntax lwt.syntax.options lwt.syntax sarek_syntax spoc_external_kernels
+MODULES=Spoc Kirc Bigarray Unix
+PRIMJS=$(shell ocamlfind query spoc)/spoc_lib.js
+CAMLP4=1
+OPT=1
+LWT=1
+JSOO=1
 #######################################################################
 # configuration
 
@@ -80,7 +85,7 @@ endif
 
 # syntax extensions
 ifneq ($(SYNTAX),)
-SYNTAX_LIB=$(foreach s,$(SYNTAX),`ocamlfind query -predicates syntax,toploop,preprocessor -a-format $(s)`)
+SYNTAX_LIB=-I `ocamlfind query sarek_syntax` $(foreach s,$(SYNTAX),`ocamlfind query -predicates syntax,toploop,preprocessor -a-format $(s)`)
 SYNTAX_INC=$(foreach s,$(SYNTAX),`ocamlfind query -i-format $(s)`)
 endif
 
@@ -90,7 +95,7 @@ Arg Array ArrayLabels Buffer Callback CamlinternalLazy CamlinternalMod Camlinter
 Char Complex Digest Dynlink Filename Format Genlex Gc Hashtbl Int32 Int64 Lazy Lexing \
 List ListLabels Map Marshal MoreLabels Nativeint Obj Oo Parsing Pervasives Printexc \
 Printf Queue Random Scanf Set Sort Stack StdLabels Stream String StringLabels Sys Weak \
-Iocaml
+Iocaml Bigarray
 
 # camlp4
 ifeq ($(CAMLP4),1)
@@ -129,7 +134,7 @@ full:
 	make all \
 		OPT=1 EXT=".full" \
 		CAMLP4=1 LWT=1 JSOO=1 \
-		SYNTAX="js_of_ocaml.syntax lwt.syntax.options lwt.syntax" 
+		SYNTAX="js_of_ocaml.syntax lwt.syntax.options lwt.syntax sarek_syntax spoc_external_kernels"
 
 min:
 	make all OPT=1 EXT=".min"
@@ -147,29 +152,31 @@ exec.cmi: exec.mli
 	ocamlfind ocamlc -c exec.mli
 
 exec.cmo: exec.ml exec.cmi 
-	ocamlfind ocamlc -c \
+	ocamlfind ocamlc -thread -c \
 		-syntax camlp4o -package js_of_ocaml.syntax \
 		$(STD_PACKAGES) \
 		$(COMPILER_LIBS_INC) \
 		exec.ml
 
 iocaml.cmo: iocaml.ml exec.cmi iocaml.cmi
-	ocamlfind ocamlc -c \
+	ocamlfind ocamlc -thread -c \
 		-syntax camlp4o -package js_of_ocaml.syntax \
 		$(STD_PACKAGES) \
 		$(COMPILER_LIBS_INC) \
 		iocaml.ml
 
 iocaml_main.cmo: iocaml_main.ml iocaml.cmi
-	ocamlfind ocamlc -c iocaml_main.ml
+	ocamlfind ocamlc -thread -c iocaml_main.ml
 
 iocaml_full.byte: exec.cmo iocaml.cmo iocaml_main.cmo
-	ocamlfind ocamlc -linkall -linkpkg -o $@ \
+	ocamlfind ocamlc -thread -linkall -linkpkg -o $@ \
 		$(STD_PACKAGES) \
 		$(USER_PACKAGES) \
 		$(COMPILER_LIBS_INC) $(COMPILER_LIBS) \
 		$(CAMLP4_LIBS_INC) $(CAMLP4_LIBS) \
 		$(SYNTAX_LIB) \
+		-I `ocamlfind query sarek_syntax` \
+		-I `ocamlfind query spoc_external_kernels` \
 		exec.cmo iocaml.cmo iocaml_main.cmo
 
 iocaml.byte: iocaml_full.byte 
